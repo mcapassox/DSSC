@@ -1,0 +1,11 @@
+void vec_sum(int* out, const int* in, const size_t size);
+void swapPP(int** a, int** b);
+void fill_vec(int* v, const int x, const size_t size);
+int **callocate_matrix(const size_t rows, const size_t cols);
+void deallocate_matrix(int **A, const size_t rows);
+void print_matrix(int** A, const size_t n_rows, const size_t n_cols);
+void set_one(int** A, const size_t n_rows, const size_t offset);
+void print_vector(int* A, size_t n_cols);
+void set_one_vect(int* A, const size_t offset);
+void print_vectMat(const int* matrix, const size_t matrix_size);
+void copy(int* a, int* b, const size_t size);
