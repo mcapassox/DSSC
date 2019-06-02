@@ -1,0 +1,1 @@
+To compile: type make in the individual exercises folder
