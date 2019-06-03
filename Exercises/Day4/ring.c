@@ -4,32 +4,35 @@
 #include "utils.h"
 #include "cptimer.h"
 
+#define  REPETITIONS 100
+
 // single element being passed
 void blocking_single(const int rank, const int size) {
 
-  int X = rank, X2, sum = rank;
-  double t1, t2;
+    int X = rank, X2, sum = rank;
+    double t1, t2;
 
-  if(rank == 0)
-  	t1 = seconds();
+    if(rank == 0)
+        t1 = seconds();
 
-  // Each process receives from the previous process and sends to the next one
-  for(size_t i=0; i<size-1; i++)
-  {
-      MPI_Send(&X, 1, MPI_INT, (rank+1)%size,    101, MPI_COMM_WORLD);
-      MPI_Recv(&X2, 1, MPI_INT, (rank-1+size)%size, 101, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      sum += X2;
-      X = X2;
-  }
+    // Each process receives from the previous process and sends to the next one
+    for(size_t i=0; i<size-1; i++)
+    {
+        MPI_Send(&X, 1, MPI_INT, (rank+1)%size,    101, MPI_COMM_WORLD);
+        MPI_Recv(&X2, 1, MPI_INT, (rank-1+size)%size, 101, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        sum += X2;
+        X = X2;
+    }
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(rank == 0)
-  	t2 = seconds();
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(rank == 0)
+        t2 = seconds();
 
-  printf("Block, single: Process: %d and the sum is: %d\n",rank,sum);
+    printf("Block, single: Process: %d and the sum is: %d\n",rank,sum);
 
-  if(rank==0)
-      printf("Blocking Single element: elapsed-time: %f\n\n", t2-t1);
+    if(rank==0) {
+        printf("Blocking Single element: elapsed-time: %f\n\n", t2-t1);
+    }
 }
 
 // vector being passed
@@ -37,135 +40,124 @@ void blocking_vec(const int rank, const int size, const int N) {
 
     double t1, t2;
 
+    if(rank == 0)
+        t1 = seconds();
+
+    for (size_t j = 0; j < REPETITIONS; j++) {
+        int* Xs = (int*)malloc(N*sizeof(int));
+        int* X2s = (int*)malloc(N*sizeof(int));
+        int* sums = (int*)malloc(N*sizeof(int));
+
+        // fill vectors
+        fill_vec(Xs, rank, N);
+        fill_vec(sums, rank, N);
+
+        // each process sends to the next one and receives from the previous one
+        for(size_t i=0; i<size-1; i++)
+        {
+            MPI_Send(Xs, N, MPI_INT, (rank+1)%size, 101, MPI_COMM_WORLD);
+            MPI_Recv(X2s, N, MPI_INT, (rank-1+size)%size, 101, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+            // sum the vectors
+            vec_sum(sums,X2s,N);
+            swapPP(&Xs, &X2s);
+        }
+
+        // free memory
+        free(Xs);
+        free(X2s);
+        //printf("BLOCKING vector, Process: %d and the sum is: %d\n",rank,sums[0]);
+        free(sums);
+    }
     MPI_Barrier(MPI_COMM_WORLD);
     if(rank == 0)
-    	t1 = seconds();
-
-    int* Xs = malloc(N*sizeof(int));
-    int* X2s = malloc(N*sizeof(int));
-    int* sums = malloc(N*sizeof(int));
-
-    // fill vectors
-    fill_vec(Xs, rank, N);
-    fill_vec(sums, rank, N);
-
-    // each process sends to the next one and receives from the previous one
-    for(size_t i=0; i<size-1; i++)
-    {
-        MPI_Send(Xs, 1, MPI_INT, (rank+1)%size,    101, MPI_COMM_WORLD);
-        MPI_Recv(X2s, 1, MPI_INT, (rank-1+size)%size, 101, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-        // sum the vectors
-        vec_sum(sums,X2s,N);
-
-        // Swapping is only necessary to properly free memory
-        swapPP(&Xs, &X2s);
+        t2 = seconds();
+    if(rank==0) {
+        //printf("BLOCKING: elapsed-time: %f\n\n", (t2-t1)/REPETITIONS);
+        printf("%f, ", (t2-t1)/REPETITIONS);
     }
 
-    // free memory
-    free(Xs);
-    free(X2s);
-    free(sums);
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    if(rank == 0)
-    	t2 = seconds();
-
-   printf("Vec: block: Process: %d and the sum is: %d\n",rank,sums[0]);
-
-    if(rank==0)
-      printf("Blocking Vector: elapsed-time: %f\n\n", t2-t1);
 }
 
 // single element being passed, non blocking
 void nonblocking_single(const int rank, const int size) {
 
-  double t1, t2;
+    double t1, t2;
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(rank == 0)
-  	t1 = seconds();
+    if(rank == 0)
+        t1 = seconds();
 
-  MPI_Request request;
-  MPI_Status status;
+    MPI_Request request;
+    MPI_Status status;
 
-  int X = rank, X2, sum = rank;
+    int X = rank, X2, sum = (rank+1)%size;
 
-  // each process sends to the next one and receives from the previous one
-  for(size_t i=0; i<size-1; i++)
-  {
-      MPI_Isend(&X, 1, MPI_INT, (rank+1)%size,101, MPI_COMM_WORLD,&request);
-      MPI_Irecv(&X2, 1, MPI_INT, (rank-1+size)%size, 101, MPI_COMM_WORLD, &request);
-      MPI_Wait(&request, &status);
+    // each process sends to the next one and receives from the previous one
+    for(size_t i=0; i<size-1; i++)
+    {
+        MPI_Isend(&X, 1, MPI_INT, (rank+1)%size, 101, MPI_COMM_WORLD, &request);
+        // sum up
+        sum += X;
+        MPI_Recv(&X2, 1, MPI_INT, (rank-1+size)%size, 101, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Wait(&request, &status);
 
-      // sum up result
-      sum += X2;
-      X = X2;
-  }
+        X = X2;
+    }
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(rank == 0)
-  	t2 = seconds();
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(rank == 0)
+        t2 = seconds();
 
-  printf("Single, non block: Process: %d and the sum is: %d\n",rank,sum);
+    printf("Single, non block: Process: %d and the sum is: %d\n",rank,sum);
 
-  if(rank==0)
-      printf("NON Blocking Single element: elapsed-time: %f\n\n", t2-t1);
+    if(rank==0)
+        printf("NON Blocking Single element: elapsed-time: %f\n\n", t2-t1);
 }
 
 // vector being passed, non blocking
 void nonblocking_vec(const int rank, const int size, const int N) {
 
-    double t1, t2;
+    double t1, t2 = 0;
 
-    MPI_Barrier(MPI_COMM_WORLD);
     if(rank == 0)
-    	t1 = seconds();
+        t1 = seconds();
+    for (size_t j = 0; j < REPETITIONS; j++) {
 
-    MPI_Request request;
-    MPI_Status status;
+        MPI_Request request;
+        MPI_Status status;
 
-    int* Xs = malloc(N*sizeof(int));
-    int* X2s = malloc(N*sizeof(int));
-    int* sums = malloc(N*sizeof(int));
+        int* Xs = (int*)malloc(N*sizeof(int));
+        int* X2s = (int*)malloc(N*sizeof(int));
+        int* sums = (int*)malloc(N*sizeof(int));
 
-    // fill vectors
-    fill_vec(Xs, rank, N);
-    fill_vec(sums, rank, N);
-    // each process sends to the next one and receives from the previous one
-    for(size_t i=0; i<size-1; i++)
-    {
+        // fill vectors
+        fill_vec(Xs, rank, N);
+        fill_vec(sums, (rank+1)%size, N);
+        // each process sends to the next one and receives from the previous one
+        for(size_t i=0; i<size-1; i++)
+        {
 
-      MPI_Isend(Xs, 1, MPI_INT, (rank+1)%size,101, MPI_COMM_WORLD, &request);
+            MPI_Isend(Xs, N, MPI_INT, (rank+1)%size, 101, MPI_COMM_WORLD, &request);
+            vec_sum(sums, Xs, N);
+            MPI_Recv(X2s, N, MPI_INT, (rank-1+size)%size, 101, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Wait(&request, &status);
+            swapPP(&Xs,&X2s);
+        }
 
-      MPI_Irecv(X2s, 1, MPI_INT, (rank-1+size)%size, 101, MPI_COMM_WORLD, &request);
+        // free memory
+        free(Xs);
+        free(X2s);
 
-      MPI_Wait(&request, &status);
-      // sum up vectors
-      vec_sum(sums,X2s,N);
-
-      // Swapping is only necessary to properly free memory
-      swapPP(&Xs, &X2s);
-
-      /*MPI_Isend(&Xs, N, MPI_INT, (rank+1)%size, 101, MPI_COMM_WORLD, &request);
-      vec_sum(sums, X2s, N);
-	    MPI_Wait(&request, MPI_STATUS_IGNORE);
-	    MPI_Recv(&X2s, N, MPI_INT, (rank-1)%size, 101, MPI_COMM_WORLD, MPI_STATUS_IGNORE);*/
+        //printf("NON BLOCKING vector, Process: %d and the sum is: %d\n",rank,sums[0]);
+        free(sums);
     }
-
-    // free memory
-    free(Xs);
-    free(X2s);
-    free(sums);
-
     MPI_Barrier(MPI_COMM_WORLD);
     if(rank == 0)
-    	t2 = seconds();
-
-    printf("VEC: Process: %d and the sum is: %d\n",rank,sums[0]);
-
-    if(rank==0)
-      printf("NON Blocking Vector: elapsed-time: %f\n\n", t2-t1);
+        t2 = seconds();
+    if(rank==0) {
+        //printf("NON BLOCKING Vector: elapsed-time: %f\n\n", (t2-t1)/REPETITIONS);
+        printf("%f\n", (t2-t1)/REPETITIONS);
+    }
 }
 
 
@@ -174,7 +166,7 @@ int main(int argc, char* argv[])
     size_t N = atoi(argv[1]);
 
     if(argc < 2)
-    	printf("One value must be passed: N");
+        printf("One value must be passed: N");
 
     int rank, size;
 
@@ -182,11 +174,17 @@ int main(int argc, char* argv[])
     MPI_Comm_rank( MPI_COMM_WORLD, &rank );
     MPI_Comm_size( MPI_COMM_WORLD, &size );
 
-    blocking_single(rank, size);
+    if (rank == 0) {
+        printf("%d, ", size);
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    nonblocking_single(rank, size);
+    //blocking_single(rank, size);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    //nonblocking_single(rank, size);
 
     MPI_Barrier(MPI_COMM_WORLD);
 

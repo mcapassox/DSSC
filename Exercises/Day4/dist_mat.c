@@ -9,10 +9,10 @@
 
 // blocking version
 void blocking_dist(int** dist_mat_row, const int* chunk_size, const size_t n_cols, const size_t rank, const size_t size) {
-    
+
     // number of rows of each slice
     int n_rows = chunk_size[rank];
-	
+
     // print on screen if n < 10
     if(n_cols < 10) {
     	// 0th process receives, sets and prints
@@ -54,7 +54,7 @@ void blocking_dist(int** dist_mat_row, const int* chunk_size, const size_t n_col
             // prepare file
             FILE* data_file;
             data_file=fopen("data.dat","wb");
-            
+
             // 0th process has 0 offset
             size_t offset = 0;
             set_one(dist_mat_row, n_rows, offset);
@@ -75,8 +75,8 @@ void blocking_dist(int** dist_mat_row, const int* chunk_size, const size_t n_col
             }
 
             fclose(data_file);
- 	    // read the matrix from file and print it (just for checking)
- 	    //int* complete_mat = (int*) malloc(sizeof(int)*n_cols*n_cols);
+ 	          // read the matrix from file and print it (just for checking)
+ 	          //int* complete_mat = (int*) malloc(sizeof(int)*n_cols*n_cols);
             //data_file = fopen("data.dat","r");
             //fread(complete_mat,sizeof(int),n_cols*n_cols,data_file);
             //print_vectMat(complete_mat,n_cols);
@@ -97,7 +97,7 @@ void non_blocking_dist(int** dist_mat_row, int* chunk_size, const size_t n_cols,
     int n_rows = chunk_size[rank];
     MPI_Request request;
     MPI_Status status;
-    
+
     // chunk_size[0] is the max number of rows of all the slices
     int max = chunk_size[0];
     int **support = callocate_matrix(max, n_cols);
@@ -125,7 +125,7 @@ void non_blocking_dist(int** dist_mat_row, int* chunk_size, const size_t n_cols,
 
                 offset += chunk_size[i-1];
             }
-            
+
             // set and print last slice
             for (size_t k = 0; k < chunk_size[size-1]; k++) {
                 set_one_vect(dist_mat_row[k], offset+k);
@@ -165,13 +165,13 @@ void non_blocking_dist(int** dist_mat_row, int* chunk_size, const size_t n_cols,
 
                 offset += chunk_size[i-1];
             }
-            
+
             // set and print last slice
             for (size_t k = 0; k < chunk_size[size-1]; k++) {
                 set_one_vect(dist_mat_row[k], offset+k);
                 fwrite(dist_mat_row[k], sizeof(int), n_cols, data_file);
             }
-            
+
             fclose(data_file);
 
 	    //just for checking
@@ -218,7 +218,7 @@ void non_blocking_dist(int** dist_mat_row, int* chunk_size, const size_t n_cols,
         printf("%d,", size);
 
         // Row distribution
-	
+
 	// split the matrix in size different (row) slices
         int min_chunk = N/size, chunk_rem = N%size;
         int chunk_size[size];
@@ -234,7 +234,7 @@ void non_blocking_dist(int** dist_mat_row, int* chunk_size, const size_t n_cols,
 
         int n_cols = N;
         int n_rows = chunk_size[rank];
-        
+
         // declare (row) slices
         int** dist_mat_row;
         double accum = 0;
@@ -251,13 +251,13 @@ void non_blocking_dist(int** dist_mat_row, int* chunk_size, const size_t n_cols,
           end = seconds();
           accum += end-begin;
         }
-	
+
 	// print time of blocking version
         if (rank == 0) {
             printf("%f,", (end-begin)/REPETITIONS);
         }
         accum = 0;
-        
+
         // ------- non blocking -------
         for (size_t i = 0; i < REPETITIONS; i++) {
           MPI_Barrier(MPI_COMM_WORLD);
@@ -270,12 +270,12 @@ void non_blocking_dist(int** dist_mat_row, int* chunk_size, const size_t n_cols,
           end = seconds();
           accum += end-begin;
         }
-	
+
 	// print time of non blocking version
         if (rank == 0) {
             printf("%f\n", (end-begin)/REPETITIONS);
         }
-	
+
 	// free memory
         deallocate_matrix(dist_mat_row, n_rows);
 
